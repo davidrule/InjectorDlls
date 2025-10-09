@@ -64,6 +64,8 @@ static CRITICAL_SECTION g_mapLock;
 static std::unordered_map<unsigned long, std::wstring> g_ip4ToHost; // IPv4 in network order
 static std::unordered_map<std::wstring, std::wstring> g_ip6ToHost;  // IPv6 numeric string -> host
 static std::vector<std::wstring> g_buffer;
+static HANDLE g_stopEvent = NULL;
+static HANDLE g_flushThread = NULL;
 
 static void write_lines_and_clear()
 {
@@ -98,6 +100,25 @@ static void log_row(const std::wstring& ip, const std::wstring& host)
         write_lines_and_clear();
     }
     LeaveCriticalSection(&g_mapLock);
+}
+
+static DWORD WINAPI FlushThreadProc(LPVOID)
+{
+    for (;;) {
+        DWORD w = WaitForSingleObject(g_stopEvent, 100); // 100ms cadence
+        if (w == WAIT_OBJECT_0)
+            break;
+        EnterCriticalSection(&g_mapLock);
+        if (!g_buffer.empty())
+            write_lines_and_clear();
+        LeaveCriticalSection(&g_mapLock);
+    }
+    // final flush on exit
+    EnterCriticalSection(&g_mapLock);
+    if (!g_buffer.empty())
+        write_lines_and_clear();
+    LeaveCriticalSection(&g_mapLock);
+    return 0;
 }
 
 static unsigned short bswap16(unsigned short v) { return (unsigned short)((v<<8) | (v>>8)); }
@@ -493,8 +514,9 @@ static void init_paths(HINSTANCE h)
     for (int i = (int)wcslen(path) - 1; i >= 0; --i) { if (path[i] == L'\\' || path[i]==L'/') { path[i] = 0; break; } }
     wsprintfW(g_logPath, L"%s\\LBN_looker.log", path);
     
-    // Create the log file immediately with a startup message
+    // Create the log file immediately with a startup message and flush so file exists
     log_row(L"LookBlockNet", L"Initialized and hooks installed");
+    write_lines_and_clear();
 }
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
@@ -503,11 +525,22 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
         InitializeCriticalSection(&g_mapLock);
         init_paths(h);
         install_hooks();
+        // start periodic flusher
+        g_stopEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+        g_flushThread = CreateThread(NULL, 0, FlushThreadProc, NULL, 0, NULL);
         
         // Show a message box confirming the DLL is loaded and hooks are installed
         MessageBoxW(NULL, L"LookBlockNet DLL loaded and hooks installed.\nCheck for log file in app directory.", 
                    L"LookBlockNet", MB_OK | MB_ICONINFORMATION);
     } else if (r == DLL_PROCESS_DETACH) {
+        if (g_stopEvent) {
+            SetEvent(g_stopEvent);
+        }
+        if (g_flushThread) {
+            WaitForSingleObject(g_flushThread, 500);
+            CloseHandle(g_flushThread); g_flushThread = NULL;
+        }
+        if (g_stopEvent) { CloseHandle(g_stopEvent); g_stopEvent = NULL; }
         write_lines_and_clear();
         DeleteCriticalSection(&g_mapLock);
     }
