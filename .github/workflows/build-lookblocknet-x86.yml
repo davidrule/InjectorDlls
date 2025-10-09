@@ -52,7 +52,9 @@ jobs:
         working-directory: ${{ github.workspace }}\LookBlockNet\lookblocknet
         run: |
           set CL=/nologo /O2 /MD /DNOMINMAX /DWIN32_LEAN_AND_MEAN
-          cl /LD lookblocknet.cpp /link /nologo /out:lookblocknet.dll kernel32.lib user32.lib ws2_32.lib dnsapi.lib
+          set INCLUDES=/I %GITHUB_WORKSPACE%\third_party\detours\include
+          set LIBS=/link /nologo /out:lookblocknet.dll kernel32.lib user32.lib ws2_32.lib dnsapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X86\detours.lib
+          cl /LD lookblocknet.cpp %INCLUDES% %LIBS%
 
       - name: Upload artifacts (x86)
         uses: actions/upload-artifact@v4
