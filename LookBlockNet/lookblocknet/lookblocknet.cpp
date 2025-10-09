@@ -1,6 +1,7 @@
 // LookBlockNet DLL: "Look" phase — hook ws2_32!connect and dnsapi!DnsQueryW to log per-process network intents.
 
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <windns.h>
 #include <unordered_map>
@@ -186,7 +187,7 @@ static DNS_STATUS WINAPI Hook_DnsQueryEx(PDNS_QUERY_REQUEST req, PDNS_QUERY_RESU
     if (st == 0 && res && res->pQueryRecords && req && req->QueryName) {
         std::wstring name(req->QueryName);
         EnterCriticalSection(&g_mapLock);
-        for (PDNS_RECORDW p = res->pQueryRecords; p != nullptr; p = p->pNext) {
+        for (PDNS_RECORD p = res->pQueryRecords; p != nullptr; p = p->pNext) {
             if (p->wType == DNS_TYPE_A) {
                 unsigned long ip = p->Data.A.IpAddress; g_ip4ToHost[ip] = name;
             } else if (p->wType == DNS_TYPE_AAAA) {
