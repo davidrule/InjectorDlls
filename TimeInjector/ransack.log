@@ -1,0 +1,209 @@
+
+xAnalyzer 2.5.6 Plugin by ThunderCls 2021
+Extended analysis for static code
+-> For latest release, issues, etc....
+-> For help type command "xanal help"
+-> code: http://github.com/ThunderCls/xAnalyzer
+-> blog: http://reversec0de.wordpress.com
+
+Initializing wait objects...
+Initializing debugger...
+Initializing debugger functions...
+Setting JSON memory management functions...
+Getting directory information...
+Start file read thread...
+Retrieving syscall indices...
+Symbol Path: C:\Users\Vihanga\Desktop\x64DBG\release\x64\symbols
+Allocating message stack...
+Initializing global script variables...
+Registering debugger commands...
+Registering GUI command handler...
+Registering expression functions...
+Registering format functions...
+Registering Script DLL command handler...
+Starting command loop...
+Initialization successful!
+Loading plugins...
+[pluginload] ExtraInfo
+[PLUGIN] ExtraInfo v1 Loaded!
+[pluginload] MCPx64dbg
+Syscall indices loaded!
+MCP - x64DBG Server plugin loading...
+[PLUGIN, MCP - x64DBG Server] Command "httpserver" registered!
+[PLUGIN, MCP - x64DBG Server] Command "httpport" registered!
+MCP - x64DBG Server started on port 50400
+MCP - x64DBG Server plugin loaded!
+[PLUGIN] MCP - x64DBG Server v1 Loaded!
+[pluginload] ScyllaHideX64DBGPlugin
+HTTP server started at http://localhost:50400/
+Error codes database loaded!
+Exception codes database loaded!
+[PLUGIN] ScyllaHide v900 Loaded!
+NTSTATUS codes database loaded!
+Windows constant database loaded!
+Reading notes file...
+File read thread finished!
+ScyllaHide Plugin v1.4.760-a727ac3 Copyright (C) 2014 Aguila / cypher
+[pluginload] x64DbgMCPServer
+[PLUGIN, MCP - Agent Smithers] Command "MCP_-_Agent_Smithers" registered!
+[PLUGIN, MCP - Agent Smithers] Command "StartMCPServer" registered!
+[PLUGIN, MCP - Agent Smithers] Command "StopMCPServer" registered!
+[PLUGIN, MCP - Agent Smithers] Command "ExecuteDebuggerCommandDirect" registered!
+[PLUGIN, MCP - Agent Smithers] Expression function "DotNetAdd" registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_INITDEBUG registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_STOPDEBUG registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_CREATEPROCESS registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_LOADDLL registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_DEBUGEVENT registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_OUTPUTDEBUGSTRING registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_BREAKPOINT registered!
+[PLUGIN, MCP - Agent Smithers] Event callback CB_SYSTEMBREAKPOINT registered!
+[PLUGIN, MCP - Agent Smithers] PluginHandle: 4
+[PLUGIN] MCP - Agent Smithers v1 Loaded!
+Starting MCPServer
+MCP server lising on +
+MCP server started. CurrentlyDebugging: True IsRunning: True
+MCPServer Started
+[pluginload] xAnalyzer
+[PLUGIN, xAnalyzer] Command "xanal" registered!
+[PLUGIN, xAnalyzer] Command "xanalremove" registered!
+[PLUGIN] xAnalyzer v2 Loaded!
+Handling command line...
+  "C:\Users\Vihanga\Desktop\x64DBG\release\x64\x64dbg.exe" "D:\ransak\AgentRansack.exe" "" "D:\ransak"
+Debugging: D:\ransak\AgentRansack.exe
+Database file: C:\Users\Vihanga\Desktop\x64DBG\release\x64\db\AgentRansack.exe.dd64
+[PLUGIN, MCP - Agent Smithers] debugging of file D:\ransak\AgentRansack.exe started!
+Process Started: 00007FF717260000 D:\ransak\AgentRansack.exe
+  "D:\ransak\AgentRansack.exe"
+  argv[0]: D:\ransak\AgentRansack.exe
+Breakpoint at 00007FF71734F430 (entry breakpoint) set!
+[PLUGIN, MCP - Agent Smithers] Create process D:\ransak\AgentRansack.exe
+DLL Loaded: 00007FFC30630000 C:\Windows\System32\ntdll.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL ntdll.dll
+DLL Loaded: 00007FFC2FAE0000 C:\Windows\System32\kernel32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL kernel32.dll
+DLL Loaded: 00007FFC2E150000 C:\Windows\System32\KernelBase.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL kernelbase.dll
+DLL Loaded: 00007FFC2F8B0000 C:\Windows\System32\user32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL user32.dll
+DLL Loaded: 00007FFC2E510000 C:\Windows\System32\win32u.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL win32u.dll
+DLL Loaded: 00007FFC2FD10000 C:\Windows\System32\gdi32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL gdi32.dll
+DLL Loaded: 00007FFC2E540000 C:\Windows\System32\gdi32full.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL gdi32full.dll
+DLL Loaded: 00007FFC2DCD0000 C:\Windows\System32\msvcp_win.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL msvcp_win.dll
+DLL Loaded: 00007FFC2DFA0000 C:\Windows\System32\ucrtbase.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL ucrtbase.dll
+Thread 11716 created, Entry: ntdll.00007FFC3067D110, Parameter: 000001FA4BA46200
+Thread 13008 created, Entry: ntdll.00007FFC3067D110, Parameter: 000001FA4BA46200
+Thread 9536 created, Entry: ntdll.00007FFC3067D110, Parameter: 000001FA4BA46200
+DLL Loaded: 00007FFC2FC30000 C:\Windows\System32\comdlg32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL comdlg32.dll
+Skipping unsupported debug type IMAGE_DEBUG_TYPE_POGO in module version.dll...
+Did not find any supported debug types in module version.dll!
+DLL Loaded: 0000000065EC0000 D:\ransak\version.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL version.dll
+DLL Unloaded: 0000000065EC0000 version.dll
+DLL Loaded: 00007FFC26880000 C:\Windows\System32\mpr.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL mpr.dll
+DLL Loaded: 00007FFC1D5D0000 C:\Windows\System32\winmm.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL winmm.dll
+DLL Loaded: 00007FFC30110000 C:\Windows\System32\msvcrt.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL msvcrt.dll
+DLL Loaded: 00007FFC2FDA0000 C:\Windows\System32\combase.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL combase.dll
+DLL Loaded: 00007FFBBF2D0000 D:\ransak\mfc140u.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL mfc140u.dll
+DLL Loaded: 00007FFC2F7F0000 C:\Windows\System32\advapi32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL advapi32.dll
+DLL Loaded: 00007FFC2F250000 C:\Windows\System32\sechost.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL sechost.dll
+DLL Loaded: 000001FA4BB40000 C:\Windows\System32\rpcrt4.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL rpcrt4.dll
+DLL Loaded: 00007FFC2E6F0000 C:\Windows\System32\rpcrt4.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL rpcrt4.dll
+DLL Loaded: 00007FFC30340000 C:\Windows\System32\SHCore.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL shcore.dll
+DLL Loaded: 00007FFC2FD40000 C:\Windows\System32\shlwapi.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL shlwapi.dll
+DLL Loaded: 00007FFC2E810000 C:\Windows\System32\shell32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL shell32.dll
+DLL Loaded: 00007FFC1D330000 C:\Windows\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.19041.6280_none_60bc30a171f2f3f3\comctl32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL comctl32.dll
+DLL Unloaded: 000001FA4BB40000 rpcrt4.dll
+DLL Loaded: 00007FFC1DEA0000 C:\Windows\System32\version.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL version.dll
+DLL Loaded: 00007FFC2E4E0000 C:\Windows\System32\bcrypt.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL bcrypt.dll
+DLL Loaded: 00007FFC304C0000 C:\Windows\System32\ole32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL ole32.dll
+DLL Loaded: 00007FFC303F0000 C:\Windows\System32\oleaut32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL oleaut32.dll
+DLL Loaded: 00007FFC2B000000 C:\Windows\System32\uxtheme.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL uxtheme.dll
+DLL Loaded: 00007FFC301B0000 C:\Windows\System32\imagehlp.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL imagehlp.dll
+DLL Loaded: 00007FFBEA400000 D:\ransak\msvcp140.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL msvcp140.dll
+DLL Loaded: 00007FFBA8600000 D:\ransak\SearchLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL searchlib.dll
+DLL Loaded: 00007FFBBE860000 D:\ransak\UIExtLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL uiextlib.dll
+DLL Loaded: 00007FFC08BF0000 D:\ransak\vcruntime140.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL vcruntime140.dll
+DLL Loaded: 00007FFC247B0000 D:\ransak\vcruntime140_1.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL vcruntime140_1.dll
+DLL Loaded: 00007FFBBE6F0000 D:\ransak\ConfigLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL configlib.dll
+DLL Loaded: 00007FFB83270000 D:\ransak\TextFuncLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL textfunclib.dll
+DLL Loaded: 00007FFBBAD00000 D:\ransak\DirTraverseLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL dirtraverselib.dll
+DLL Loaded: 000001FA4BA10000 C:\Windows\System32\bcrypt.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL bcrypt.dll
+DLL Unloaded: 000001FA4BA10000 bcrypt.dll
+DLL Loaded: 00007FFBE6360000 D:\ransak\concrt140.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL concrt140.dll
+DLL Loaded: 00007FFBE6B80000 D:\ransak\StreamLib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL streamlib.dll
+DLL Loaded: 00007FFBF4E20000 D:\ransak\CrashRpt1403.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL crashrpt1403.dll
+DLL Loaded: 00007FFC2A570000 C:\Windows\System32\msimg32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL msimg32.dll
+DLL Loaded: 00007FFC0BC90000 C:\Windows\WinSxS\amd64_microsoft.windows.gdiplus_6595b64144ccf1df_1.1.19041.6216_none_919f98d0cc8c5626\GdiPlus.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL gdiplus.dll
+DLL Loaded: 00007FFB82470000 D:\ransak\BCGCBPRO3360u143.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL bcgcbpro3360u143.dll
+DLL Loaded: 00007FFC27F70000 C:\Windows\System32\xmllite.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL xmllite.dll
+DLL Loaded: 00007FFC2E6C0000 C:\Windows\System32\imm32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL imm32.dll
+Breakpoint at 00007FFB8220FD30 (TLS Callback 1 (pdfium.dll)) set!
+DLL Loaded: 00007FFB81F20000 D:\ransak\pdfium.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL pdfium.dll
+DLL Loaded: 00007FFC18190000 C:\Windows\System32\ELSCore.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL elscore.dll
+DLL Loaded: 00007FFC10390000 C:\Windows\System32\winspool.drv
+[PLUGIN, MCP - Agent Smithers] Load DLL winspool.drv
+DLL Loaded: 00007FFBD7550000 C:\Windows\System32\odbc32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL odbc32.dll
+DLL Loaded: 00007FFC2DE40000 C:\Windows\System32\crypt32.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL crypt32.dll
+DLL Loaded: 00007FFBD6A90000 D:\ransak\ConfigUILib.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL configuilib.dll
+DLL Loaded: 00007FFC2D9F0000 C:\Windows\System32\dpapi.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL dpapi.dll
+DLL Loaded: 00007FFC136A0000 C:\Windows\System32\oleacc.dll
+[PLUGIN, MCP - Agent Smithers] Load DLL oleacc.dll
+[ScyllaHide] Loaded VA for NtUserBlockInput = 0x00007FFC2E518470
+[ScyllaHide] Loaded VA for NtUserQueryWindow = 0x00007FFC2E511230
+[ScyllaHide] Loaded VA for NtUserGetForegroundWindow = 0x00007FFC2E5117B0
+[ScyllaHide] Loaded VA for NtUserBuildHwndList = 0x00007FFC2E5113B0
+[ScyllaHide] Loaded VA for NtUserFindWindowEx = 0x00007FFC2E511DB0
+[ScyllaHide] Loaded VA for NtUserGetClassName = 0x00007FFC2E511F50
+[ScyllaHide] Loaded VA for NtUserInternalGetWindowText = 0x00007FFC2E511C70
+[ScyllaHide] Loaded VA for NtUserGetThreadState = 0x00007FFC2E511030
+System breakpoint reached!
+[PLUGIN, MCP - Agent Smithers] SystemBreakpoint 0

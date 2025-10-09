@@ -1,0 +1,68 @@
+Run if exist third_party\detours goto HAVE_DETOURS
+  
+Microsoft (R) Program Maintenance Utility Version 14.44.35217.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours"
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\src"
+	del *~ 2>nul
+	del ..\lib.X86\detours.pdb ..\lib.X86\detours.lib 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples"
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\syelog"
+	del *~ test.txt 2> nul
+	del ..\..\include\syelog.* 2>nul
+	del ..\..\lib.X86\syelog.* 2>nul
+	del ..\..\bin.X86\syelogd.* 2>nul
+	del ..\..\bin.X86\sltest.* 2>nul
+	del ..\..\bin.X86\sltestp.* 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\simple"
+	del *~ 2>nul
+	del ..\..\bin.X86\simple*.* 2>nul
+	del ..\..\bin.X86\sleep5.* 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\slept"
+	del *~ 2>nul
+	del ..\..\bin.X86\slept*.* 2>nul
+	del ..\..\bin.X86\dslept*.* 2>nul
+	del ..\..\bin.X86\sleepold.* 2>nul
+	del ..\..\bin.X86\sleepnew.* 2>nul
+	del ..\..\bin.X86\sleepbed.* 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\setdll"
+	del *~ 2>nul
+	del ..\..\bin.X86\setdll.* 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\withdll"
+	del *~ 2>nul
+	del ..\..\bin.X86\withdll.* 2>nul
+	rmdir /q /s obj.X86 2>nul
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\cping"
+	del iping.h *.c *.obj *.sbr *~ 2>nul
+        1 file(s) copied.
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\member"
+ Created obj.X86
+	cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fdobj.X86\vc.pdb /Foobj.X86\ /c member.cpp 
+member.cpp
+	cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fe..\..\bin.X86\member.exe /Fd..\..\bin.X86\member.pdb obj.X86\member.obj  /link /release /incremental:no /profile /nodefaultlib:oldnames.lib ..\..\lib.X86\syelog.lib ..\..\lib.X86\detours.lib kernel32.lib /subsystem:console
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\region"
+ Created obj.X86
+	cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fdobj.X86\vc.pdb /Foobj.X86\ /c region.cpp 
+region.cpp
+	cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fe..\..\bin.X86\region.exe /Fd..\..\bin.X86\region.pdb obj.X86\region.obj  /link /release /incremental:no /profile /nodefaultlib:oldnames.lib ..\..\lib.X86\syelog.lib ..\..\lib.X86\detours.lib kernel32.lib /subsystem:console
+	cd "D:\a\TimeInjector\TimeInjector\third_party\detours\samples\traceapi"
+ Created obj.X86
+	rc /DDETOURS_BITS=32 /foobj.X86\trcapi.res /i..\..\include trcapi.rc
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+Copyright (C) Microsoft Corporation.  All rights reserved.
+	cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fdobj.X86\vc.pdb /Foobj.X86\ /c trcapi.cpp 
+trcapi.cpp
+D:\a\TimeInjector\TimeInjector\third_party\detours\samples\traceapi\_win32.cpp(4323): error C2065: 'GetThreadLocale': undeclared identifier
+D:\a\TimeInjector\TimeInjector\third_party\detours\samples\traceapi\_win32.cpp(7050): error C2065: 'SetThreadLocale': undeclared identifier
+NMAKE : fatal error U1077: 'cl /nologo /Zi /MT /Gm- /W4 /WX /Od /I..\..\include /Fdobj.X86\vc.pdb /Foobj.X86\ /c trcapi.cpp ' : return code '0x2'
+Stop.
+NMAKE : fatal error U1077: '"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\HostX86\x86\nmake.exe" /NOLOGO /L                 ' : return code '0x2'
+Stop.
+NMAKE : fatal error U1077: '"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\HostX86\x86\nmake.exe" /NOLOGO /                  ' : return code '0x2'
+Stop.
+Error: Process completed with exit code 2.

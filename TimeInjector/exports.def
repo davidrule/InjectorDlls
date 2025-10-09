@@ -1,0 +1,21 @@
+LIBRARY "version"
+EXPORTS
+    GetFileVersionInfoA          = TI_GetFileVersionInfoA          @1
+    GetFileVersionInfoByHandle   = TI_GetFileVersionInfoByHandle   @2
+    GetFileVersionInfoExA        = TI_GetFileVersionInfoExA        @3
+    GetFileVersionInfoExW        = TI_GetFileVersionInfoExW        @4
+    GetFileVersionInfoSizeA      = TI_GetFileVersionInfoSizeA      @5
+    GetFileVersionInfoSizeExA    = TI_GetFileVersionInfoSizeExA    @6
+    GetFileVersionInfoSizeExW    = TI_GetFileVersionInfoSizeExW    @7
+    GetFileVersionInfoSizeW      = TI_GetFileVersionInfoSizeW      @8
+    GetFileVersionInfoW          = TI_GetFileVersionInfoW          @9
+    VerFindFileA                 = TI_VerFindFileA                 @10
+    VerFindFileW                 = TI_VerFindFileW                 @11
+    VerInstallFileA              = TI_VerInstallFileA              @12
+    VerInstallFileW              = TI_VerInstallFileW              @13
+    VerLanguageNameA             = TI_VerLanguageNameA             @14
+    VerLanguageNameW             = TI_VerLanguageNameW             @15
+    VerQueryValueA               = TI_VerQueryValueA               @16
+    VerQueryValueW               = TI_VerQueryValueW               @17
+
+
