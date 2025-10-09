@@ -127,23 +127,43 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
         // Load the real system version.dll first
         load_real_version_and_plugins(h);
 
-        // Now, attempt to load our plugin with aggressive error reporting
+        // Build plugin path (same directory as this proxy)
         wchar_t dir[MAX_PATH];
         if (GetModuleFileNameW(h, dir, MAX_PATH)) {
             PathRemoveFileSpecW(dir);
             wchar_t pluginPath[MAX_PATH];
             wcscpy_s(pluginPath, dir);
             PathAppendW(pluginPath, L"lookblocknet.dll");
-            
-            // Attempt to load the library
-            g_lookBlockNet = LoadLibraryW(pluginPath);
 
-            // If it fails, show a popup box with the error. THIS IS FOR DEBUGGING.
+            // Prepare robust loading: prefer local dir for dependency search
+            HMODULE hKernel = GetModuleHandleW(L"kernel32.dll");
+            typedef BOOL (WINAPI *PFN_SetDefaultDllDirectories)(DWORD);
+            typedef DLL_DIRECTORY_COOKIE (WINAPI *PFN_AddDllDirectory)(PCWSTR);
+            typedef BOOL (WINAPI *PFN_RemoveDllDirectory)(DLL_DIRECTORY_COOKIE);
+            PFN_SetDefaultDllDirectories pSetDefaultDllDirectories = hKernel ? (PFN_SetDefaultDllDirectories)GetProcAddress(hKernel, "SetDefaultDllDirectories") : nullptr;
+            PFN_AddDllDirectory pAddDllDirectory = hKernel ? (PFN_AddDllDirectory)GetProcAddress(hKernel, "AddDllDirectory") : nullptr;
+            PFN_RemoveDllDirectory pRemoveDllDirectory = hKernel ? (PFN_RemoveDllDirectory)GetProcAddress(hKernel, "RemoveDllDirectory") : nullptr;
+
+            DLL_DIRECTORY_COOKIE cookie = 0;
+            if (pSetDefaultDllDirectories) {
+                pSetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+                if (pAddDllDirectory) cookie = pAddDllDirectory(dir);
+            }
+
+            // Attempt to load with altered search path
+            g_lookBlockNet = LoadLibraryExW(pluginPath, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+
+            if (cookie && pRemoveDllDirectory) pRemoveDllDirectory(cookie);
+
+            // Show definitive UI for debug
+            wchar_t msg[600];
             if (!g_lookBlockNet) {
                 DWORD err = GetLastError();
-                wchar_t msg[512];
-                wsprintfW(msg, L"LookBlockNet DEBUG\n\nFailed to load lookblocknet.dll from:\n%s\n\nError Code: %lu", pluginPath, err);
-                MessageBoxW(NULL, msg, L"Proxy DLL Error", MB_OK | MB_ICONERROR);
+                wsprintfW(msg, L"LookBlockNet DEBUG\n\nFAILED to load:\n%s\n\nGetLastError = %lu", pluginPath, err);
+                MessageBoxW(NULL, msg, L"version.dll proxy", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL | MB_TOPMOST | MB_SETFOREGROUND);
+            } else {
+                wsprintfW(msg, L"LookBlockNet DEBUG\n\nSUCCESS loading:\n%s", pluginPath);
+                MessageBoxW(NULL, msg, L"version.dll proxy", MB_OK | MB_ICONINFORMATION | MB_SYSTEMMODAL | MB_TOPMOST | MB_SETFOREGROUND);
             }
         }
     }
