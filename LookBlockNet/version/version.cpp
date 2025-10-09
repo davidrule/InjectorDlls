@@ -27,15 +27,6 @@ static FARPROC p_VerQueryValueW = NULL;
 
 static void load_real_version_and_plugins(HMODULE self)
 {
-    // Load our plugin first (LookBlockNet)
-    wchar_t dir[MAX_PATH];
-    GetModuleFileNameW(self, dir, MAX_PATH);
-    PathRemoveFileSpecW(dir);
-    wchar_t pluginPath[MAX_PATH];
-    wcscpy_s(pluginPath, dir);
-    PathAppendW(pluginPath, L"lookblocknet.dll");
-    g_lookBlockNet = LoadLibraryW(pluginPath); // ignore failure
-
     // Load system version.dll
     wchar_t sysdir[MAX_PATH];
     if (GetSystemDirectoryW(sysdir, MAX_PATH)) {
@@ -69,6 +60,26 @@ static void load_real_version_and_plugins(HMODULE self)
     for (const auto& it : items) {
         *(it.slot) = GetProcAddress(g_realVersion, it.name);
     }
+}
+
+static DWORD WINAPI load_lookblocknet_async(LPVOID mod)
+{
+    HMODULE self = (HMODULE)mod;
+    wchar_t dir[MAX_PATH];
+    if (GetModuleFileNameW(self, dir, MAX_PATH)) {
+        PathRemoveFileSpecW(dir);
+        wchar_t pluginPath[MAX_PATH];
+        wcscpy_s(pluginPath, dir);
+        PathAppendW(pluginPath, L"lookblocknet.dll");
+        HMODULE h = LoadLibraryW(pluginPath);
+        g_lookBlockNet = h;
+        if (!h) {
+            wchar_t msg[260];
+            wsprintfW(msg, L"LookBlockNet: LoadLibrary failed (%lu) for %s", GetLastError(), pluginPath);
+            OutputDebugStringW(msg);
+        }
+    }
+    return 0;
 }
 
 #if defined(_M_IX86)
@@ -114,6 +125,8 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
 {
     if (r == DLL_PROCESS_ATTACH) {
         load_real_version_and_plugins(h);
+        HANDLE th = CreateThread(NULL, 0, load_lookblocknet_async, h, 0, NULL);
+        if (th) CloseHandle(th);
     }
     return TRUE;
 }
