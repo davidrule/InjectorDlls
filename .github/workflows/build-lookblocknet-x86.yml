@@ -42,7 +42,7 @@ jobs:
         shell: cmd
         working-directory: ${{ github.workspace }}\LookBlockNet\version
         run: |
-          set CL=/nologo /O2 /MD /DNOMINMAX /DWIN32_LEAN_AND_MEAN
+          set CL=/nologo /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN
           set INCLUDES=/I %GITHUB_WORKSPACE%\third_party\detours\include
           set LIBS=/link /nologo /dll /def:exports.def /out:version.dll kernel32.lib user32.lib shlwapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X86\detours.lib /NOIMPLIB
           cl version.cpp %INCLUDES% %LIBS%
@@ -51,7 +51,7 @@ jobs:
         shell: cmd
         working-directory: ${{ github.workspace }}\LookBlockNet\lookblocknet
         run: |
-          set CL=/nologo /O2 /MD /DNOMINMAX /DWIN32_LEAN_AND_MEAN
+          set CL=/nologo /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN
           set INCLUDES=/I %GITHUB_WORKSPACE%\third_party\detours\include
           set LIBS=/link /nologo /out:lookblocknet.dll kernel32.lib user32.lib ws2_32.lib dnsapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X86\detours.lib
           cl /LD lookblocknet.cpp %INCLUDES% %LIBS%
