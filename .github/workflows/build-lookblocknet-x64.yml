@@ -53,7 +53,7 @@ jobs:
         run: |
           set CL=/nologo /O2 /MT /DNOMINMAX /DWIN32_LEAN_AND_MEAN
           set INCLUDES=/I %GITHUB_WORKSPACE%\third_party\detours\include
-          set LIBS=/link /nologo /out:lookblocknet.dll kernel32.lib user32.lib ws2_32.lib dnsapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X64\detours.lib
+          set LIBS=/link /nologo /out:lookblocknet.dll kernel32.lib user32.lib shlwapi.lib ws2_32.lib dnsapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X64\detours.lib
           cl /LD lookblocknet.cpp %INCLUDES% %LIBS%
 
       - name: Upload artifacts (x64)
