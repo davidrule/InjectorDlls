@@ -1,11 +1,11 @@
-name: Build LookBlockNet (x64)
+name: Build TimeInjector (x86)
 
 on:
   push:
     branches: [ main, master ]
     paths:
-      - 'LookBlockNet/**'
-      - '.github/workflows/build-lookblocknet-x64.yml'
+      - 'TimeInjector/**'
+      - '.github/workflows/build-timeinject-x86.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,10 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup MSVC (x64)
+      - name: Setup MSVC (x86)
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x64
+          arch: x86
 
       - name: Ensure Detours 4.0.1 (download)
         shell: cmd
@@ -31,34 +31,27 @@ jobs:
           del detours.zip
           :HAVE_DETOURS
 
-      - name: Build Detours (x64)
+      - name: Build Detours (x86)
         shell: cmd
         working-directory: ${{ github.workspace }}\third_party\detours\src
         run: |
           nmake clean || ver >nul
           nmake
 
-      - name: Build version.dll proxy (x64)
+      - name: Build TimeInjector DLL (x86)
         shell: cmd
-        working-directory: ${{ github.workspace }}\LookBlockNet\version
+        working-directory: ${{ github.workspace }}\TimeInjector
         run: |
           set CL=/nologo /O2 /MD /DNOMINMAX /DWIN32_LEAN_AND_MEAN
           set INCLUDES=/I %GITHUB_WORKSPACE%\third_party\detours\include
-          set LIBS=/link /nologo /dll /def:exports.def /out:version.dll kernel32.lib user32.lib shlwapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X64\detours.lib /NOIMPLIB
-          cl version.cpp %INCLUDES% %LIBS%
+          set LIBS=/link /nologo /dll /def:exports.def /out:version.dll kernel32.lib user32.lib shlwapi.lib %GITHUB_WORKSPACE%\third_party\detours\lib.X86\detours.lib /NOIMPLIB
+          cl TimeInjector.cpp %INCLUDES% %LIBS%
 
-      - name: Build lookblocknet.dll (x64)
-        shell: cmd
-        working-directory: ${{ github.workspace }}\LookBlockNet\lookblocknet
-        run: |
-          set CL=/nologo /O2 /MD /DNOMINMAX /DWIN32_LEAN_AND_MEAN
-          cl /LD lookblocknet.cpp /link /nologo /out:lookblocknet.dll kernel32.lib user32.lib ws2_32.lib dnsapi.lib
-
-      - name: Upload artifacts (x64)
+      - name: Upload artifact (x86)
         uses: actions/upload-artifact@v4
         with:
-          name: LookBlockNet-x64
+          name: TimeInjector-x86
           path: |
-            ${{ github.workspace }}\LookBlockNet\version\version.dll
-            ${{ github.workspace }}\LookBlockNet\lookblocknet\lookblocknet.dll
+            ${{ github.workspace }}\TimeInjector\version.dll
+            ${{ github.workspace }}\TimeInjector\timer.config
 
