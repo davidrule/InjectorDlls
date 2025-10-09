@@ -4,6 +4,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <windns.h>
+#include <mswsock.h>
 #include <shlwapi.h>
 #include <unordered_map>
 #include <vector>
@@ -21,6 +22,10 @@ typedef INT (WINAPI *PFN_GetAddrInfoW)(PCWSTR, PCWSTR, const ADDRINFOW*, PADDRIN
 typedef INT (WINAPI *PFN_GetAddrInfoExW)(PCWSTR, PCWSTR, DWORD, ULONG, const ADDRINFOEXW*, PADDRINFOEXW*, struct timeval*, LPOVERLAPPED, LPLOOKUPSERVICE_COMPLETION_ROUTINE, LPHANDLE);
 typedef INT (WINAPI *PFN_getaddrinfo)(const char*, const char*, const addrinfo*, addrinfo**);
 typedef INT (WSAAPI *PFN_WSAConnect)(SOCKET, const sockaddr*, int, LPWSABUF, LPWSABUF, LPQOS, LPQOS);
+typedef INT (WSAAPI *PFN_WSAIoctl)(SOCKET, DWORD, LPVOID, DWORD, LPVOID, DWORD, LPDWORD, LPWSAOVERLAPPED, LPWSAOVERLAPPED_COMPLETION_ROUTINE);
+typedef BOOL (PASCAL *LPFN_CONNECTEX)(SOCKET, const sockaddr*, int, PVOID, DWORD, LPDWORD, LPOVERLAPPED);
+typedef BOOL (WSAAPI *PFN_WSAConnectByNameW)(SOCKET, LPCWSTR, LPCWSTR, LPDWORD, LPWSABUF, LPDWORD, LPWSABUF, const struct timeval*, LPWSAOVERLAPPED);
+typedef BOOL (WSAAPI *PFN_WSAConnectByNameA)(SOCKET, LPCSTR, LPCSTR, LPDWORD, LPWSABUF, LPDWORD, LPWSABUF, const struct timeval*, LPWSAOVERLAPPED);
 // Late-load helpers
 typedef HMODULE (WINAPI *PFN_LoadLibraryW)(LPCWSTR);
 typedef HMODULE (WINAPI *PFN_LoadLibraryA)(LPCSTR);
@@ -38,6 +43,10 @@ static PFN_GetAddrInfoW   p_GetAddrInfoW = nullptr;  // ws2_32!GetAddrInfoW
 static PFN_GetAddrInfoExW p_GetAddrInfoExW = nullptr;// ws2_32!GetAddrInfoExW
 static PFN_getaddrinfo    p_getaddrinfo = nullptr;   // ws2_32!getaddrinfo (ANSI)
 static PFN_WSAConnect     p_WSAConnect = nullptr;    // ws2_32!WSAConnect
+static PFN_WSAIoctl       p_WSAIoctl = nullptr;      // ws2_32!WSAIoctl
+static LPFN_CONNECTEX     p_ConnectEx = nullptr;     // retrieved via WSAIoctl
+static PFN_WSAConnectByNameW p_WSAConnectByNameW = nullptr; // ws2_32!WSAConnectByNameW
+static PFN_WSAConnectByNameA p_WSAConnectByNameA = nullptr; // ws2_32!WSAConnectByNameA
 // Kernel32 detours
 static PFN_LoadLibraryW   p_LoadLibraryW = nullptr;
 static PFN_LoadLibraryA   p_LoadLibraryA = nullptr;
@@ -223,6 +232,65 @@ static INT WSAAPI Hook_WSAConnect(SOCKET s, const sockaddr* name, int namelen, L
     return p_WSAConnect ? p_WSAConnect(s, name, namelen, a, b, c, d) : WSAENOTSOCK;
 }
 
+static BOOL PASCAL Hook_ConnectEx(SOCKET s, const sockaddr* name, int namelen, PVOID sendbuf, DWORD sendlen, LPDWORD bytes, LPOVERLAPPED ov)
+{
+    std::wstring ipOnly = numeric_addr_from_sockaddr(name);
+    std::wstring host = L"No available/local";
+    if (name && name->sa_family == AF_INET) {
+        const sockaddr_in* s4 = (const sockaddr_in*)name;
+        unsigned long key = s4->sin_addr.S_un.S_addr;
+        EnterCriticalSection(&g_mapLock);
+        auto it = g_ip4ToHost.find(key);
+        if (it != g_ip4ToHost.end()) host = it->second;
+        LeaveCriticalSection(&g_mapLock);
+    } else if (name && name->sa_family == AF_INET6) {
+        EnterCriticalSection(&g_mapLock);
+        auto it6 = g_ip6ToHost.find(ipOnly);
+        if (it6 != g_ip6ToHost.end()) host = it6->second;
+        LeaveCriticalSection(&g_mapLock);
+    }
+    log_row(ipOnly, host);
+    return p_ConnectEx ? p_ConnectEx(s, name, namelen, sendbuf, sendlen, bytes, ov) : FALSE;
+}
+
+static INT WSAAPI Hook_WSAIoctl(SOCKET s, DWORD code, LPVOID inbuf, DWORD inlen, LPVOID outbuf, DWORD outlen, LPDWORD ret, LPWSAOVERLAPPED ov, LPWSAOVERLAPPED_COMPLETION_ROUTINE comp)
+{
+    INT r = p_WSAIoctl ? p_WSAIoctl(s, code, inbuf, inlen, outbuf, outlen, ret, ov, comp) : SOCKET_ERROR;
+    if (r == 0 && code == SIO_GET_EXTENSION_FUNCTION_POINTER && inbuf && outbuf && inlen >= sizeof(GUID) && outlen >= sizeof(LPFN_CONNECTEX)) {
+        const GUID* guid = (const GUID*)inbuf;
+        if (IsEqualGUID(*guid, WSAID_CONNECTEX)) {
+            // Save original pointer then hand back our hook
+            p_ConnectEx = *(LPFN_CONNECTEX*)outbuf;
+            *(LPFN_CONNECTEX*)outbuf = Hook_ConnectEx;
+        }
+    }
+    return r;
+}
+
+static BOOL WSAAPI Hook_WSAConnectByNameW(SOCKET s, LPCWSTR nodename, LPCWSTR servname, LPDWORD local, LPWSABUF lpb, LPDWORD remote, LPWSABUF rpb, const struct timeval* tv, LPWSAOVERLAPPED ov)
+{
+    if (nodename) {
+        EnterCriticalSection(&g_mapLock);
+        // store placeholder host; IPs will map when resolved
+        g_ip6ToHost[L"(WSAConnectByNameW)"] = nodename;
+        LeaveCriticalSection(&g_mapLock);
+    }
+    return p_WSAConnectByNameW ? p_WSAConnectByNameW(s, nodename, servname, local, lpb, remote, rpb, tv, ov) : FALSE;
+}
+static BOOL WSAAPI Hook_WSAConnectByNameA(SOCKET s, LPCSTR nodename, LPCSTR servname, LPDWORD local, LPWSABUF lpb, LPDWORD remote, LPWSABUF rpb, const struct timeval* tv, LPWSAOVERLAPPED ov)
+{
+    std::wstring wnode;
+    if (nodename) {
+        int wlen = MultiByteToWideChar(CP_ACP, 0, nodename, -1, nullptr, 0);
+        wnode.resize(wlen ? (wlen-1) : 0);
+        if (wlen) MultiByteToWideChar(CP_ACP, 0, nodename, -1, &wnode[0], wlen);
+        EnterCriticalSection(&g_mapLock);
+        g_ip6ToHost[L"(WSAConnectByNameA)"] = wnode;
+        LeaveCriticalSection(&g_mapLock);
+    }
+    return p_WSAConnectByNameA ? p_WSAConnectByNameA(s, nodename, servname, local, lpb, remote, rpb, tv, ov) : FALSE;
+}
+
 static DNS_STATUS WINAPI Hook_DnsQueryW(LPCWSTR name, WORD type, DWORD options, PVOID extra, PDNS_RECORDW* prec, PVOID* preserved)
 {
     DNS_STATUS st = p_DnsQueryW ? p_DnsQueryW(name, type, options, extra, prec, preserved) : (DNS_STATUS)ERROR_INVALID_FUNCTION;
@@ -315,6 +383,9 @@ static void ensure_hooks()
             if (!p_GetAddrInfoW) p_GetAddrInfoW = (PFN_GetAddrInfoW)GetProcAddress(hWs2, "GetAddrInfoW");
             if (!p_GetAddrInfoExW) p_GetAddrInfoExW = (PFN_GetAddrInfoExW)GetProcAddress(hWs2, "GetAddrInfoExW");
             if (!p_getaddrinfo) p_getaddrinfo = (PFN_getaddrinfo)GetProcAddress(hWs2, "getaddrinfo");
+            if (!p_WSAIoctl) p_WSAIoctl = (PFN_WSAIoctl)GetProcAddress(hWs2, "WSAIoctl");
+            if (!p_WSAConnectByNameW) p_WSAConnectByNameW = (PFN_WSAConnectByNameW)GetProcAddress(hWs2, "WSAConnectByNameW");
+            if (!p_WSAConnectByNameA) p_WSAConnectByNameA = (PFN_WSAConnectByNameA)GetProcAddress(hWs2, "WSAConnectByNameA");
             if (!p_WSAAddressToStringW) p_WSAAddressToStringW = (PFN_WSAAddressToStringW)GetProcAddress(hWs2, "WSAAddressToStringW");
             if (!p_InetNtopW) p_InetNtopW = (PFN_InetNtopW)GetProcAddress(hWs2, "InetNtopW");
             DetourTransactionBegin();
@@ -323,6 +394,9 @@ static void ensure_hooks()
             if (p_WSAConnect) DetourAttach(&(PVOID&)p_WSAConnect, Hook_WSAConnect);
             if (p_GetAddrInfoW) DetourAttach(&(PVOID&)p_GetAddrInfoW, Hook_GetAddrInfoW);
             if (p_getaddrinfo) DetourAttach(&(PVOID&)p_getaddrinfo, Hook_getaddrinfo);
+            if (p_WSAIoctl) DetourAttach(&(PVOID&)p_WSAIoctl, Hook_WSAIoctl);
+            if (p_WSAConnectByNameW) DetourAttach(&(PVOID&)p_WSAConnectByNameW, Hook_WSAConnectByNameW);
+            if (p_WSAConnectByNameA) DetourAttach(&(PVOID&)p_WSAConnectByNameA, Hook_WSAConnectByNameA);
             DetourTransactionCommit();
             g_ws2Hooked = (p_connect != nullptr);
         }
