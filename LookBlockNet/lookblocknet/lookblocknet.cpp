@@ -232,6 +232,9 @@ static void init_paths(HINSTANCE h)
     // trim to directory
     for (int i = (int)wcslen(path) - 1; i >= 0; --i) { if (path[i] == L'\\' || path[i]==L'/') { path[i] = 0; break; } }
     wsprintfW(g_logPath, L"%s\\LBN_looker.log", path);
+    
+    // Create the log file immediately with a startup message
+    log_row(L"LookBlockNet", L"Initialized and hooks installed");
 }
 
 BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
@@ -240,6 +243,10 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
         InitializeCriticalSection(&g_mapLock);
         init_paths(h);
         install_hooks();
+        
+        // Show a message box confirming the DLL is loaded and hooks are installed
+        MessageBoxW(NULL, L"LookBlockNet DLL loaded and hooks installed.\nCheck for log file in app directory.", 
+                   L"LookBlockNet", MB_OK | MB_ICONINFORMATION);
     } else if (r == DLL_PROCESS_DETACH) {
         DeleteCriticalSection(&g_mapLock);
     }
