@@ -4,6 +4,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <windns.h>
+#include <shlwapi.h>
 #include <unordered_map>
 #include <string>
 #include "detours.h"
@@ -15,6 +16,11 @@ typedef DNS_STATUS (WINAPI *PFN_DnsQuery_UTF8)(LPCSTR, WORD, DWORD, PVOID, PDNS_
 typedef DNS_STATUS (WINAPI *PFN_DnsQueryEx)(PDNS_QUERY_REQUEST, PDNS_QUERY_RESULT, PVOID);
 typedef INT (WSAAPI *PFN_WSAAddressToStringW)(LPSOCKADDR, DWORD, LPWSAPROTOCOL_INFOW, LPWSTR, LPDWORD);
 typedef PCWSTR (WINAPI *PFN_InetNtopW)(INT, PVOID, PWSTR, size_t);
+// Late-load helpers
+typedef HMODULE (WINAPI *PFN_LoadLibraryW)(LPCWSTR);
+typedef HMODULE (WINAPI *PFN_LoadLibraryA)(LPCSTR);
+typedef HMODULE (WINAPI *PFN_LoadLibraryExW)(LPCWSTR, HANDLE, DWORD);
+typedef HMODULE (WINAPI *PFN_LoadLibraryExA)(LPCSTR, HANDLE, DWORD);
 
 static PFN_connect        p_connect = nullptr;       // ws2_32!connect
 static PFN_DnsQuery_W     p_DnsQueryW = nullptr;     // dnsapi!DnsQuery_W
@@ -23,6 +29,14 @@ static PFN_DnsQuery_UTF8  p_DnsQueryUTF8 = nullptr;  // dnsapi!DnsQuery_UTF8
 static PFN_DnsQueryEx     p_DnsQueryEx = nullptr;    // dnsapi!DnsQueryEx
 static PFN_WSAAddressToStringW p_WSAAddressToStringW = nullptr; // ws2_32!WSAAddressToStringW
 static PFN_InetNtopW      p_InetNtopW = nullptr;     // ws2_32!InetNtopW (if available)
+// Kernel32 detours
+static PFN_LoadLibraryW   p_LoadLibraryW = nullptr;
+static PFN_LoadLibraryA   p_LoadLibraryA = nullptr;
+static PFN_LoadLibraryExW p_LoadLibraryExW = nullptr;
+static PFN_LoadLibraryExA p_LoadLibraryExA = nullptr;
+
+static bool g_ws2Hooked = false;
+static bool g_dnsHooked = false;
 
 static wchar_t g_logPath[MAX_PATH] = {0};
 static bool g_headerWritten = false;
@@ -201,29 +215,105 @@ static DNS_STATUS WINAPI Hook_DnsQueryEx(PDNS_QUERY_REQUEST req, PDNS_QUERY_RESU
     return st;
 }
 
+static void ensure_hooks()
+{
+    // ws2_32 hooks
+    if (!g_ws2Hooked) {
+        HMODULE hWs2 = GetModuleHandleW(L"ws2_32.dll");
+        if (hWs2) {
+            if (!p_connect) p_connect = (PFN_connect)GetProcAddress(hWs2, "connect");
+            if (!p_WSAAddressToStringW) p_WSAAddressToStringW = (PFN_WSAAddressToStringW)GetProcAddress(hWs2, "WSAAddressToStringW");
+            if (!p_InetNtopW) p_InetNtopW = (PFN_InetNtopW)GetProcAddress(hWs2, "InetNtopW");
+            DetourTransactionBegin();
+            DetourUpdateThread(GetCurrentThread());
+            if (p_connect) DetourAttach(&(PVOID&)p_connect, Hook_connect);
+            DetourTransactionCommit();
+            g_ws2Hooked = (p_connect != nullptr);
+        }
+    }
+    // dnsapi hooks
+    if (!g_dnsHooked) {
+        HMODULE hDns = GetModuleHandleW(L"dnsapi.dll");
+        if (hDns) {
+            if (!p_DnsQueryW) p_DnsQueryW = (PFN_DnsQuery_W)GetProcAddress(hDns, "DnsQuery_W");
+            if (!p_DnsQueryA) p_DnsQueryA = (PFN_DnsQuery_A)GetProcAddress(hDns, "DnsQuery_A");
+            if (!p_DnsQueryUTF8) p_DnsQueryUTF8 = (PFN_DnsQuery_UTF8)GetProcAddress(hDns, "DnsQuery_UTF8");
+            if (!p_DnsQueryEx) p_DnsQueryEx = (PFN_DnsQueryEx)GetProcAddress(hDns, "DnsQueryEx");
+            DetourTransactionBegin();
+            DetourUpdateThread(GetCurrentThread());
+            if (p_DnsQueryW) DetourAttach(&(PVOID&)p_DnsQueryW, Hook_DnsQueryW);
+            if (p_DnsQueryA) DetourAttach(&(PVOID&)p_DnsQueryA, Hook_DnsQueryA);
+            if (p_DnsQueryUTF8) DetourAttach(&(PVOID&)p_DnsQueryUTF8, Hook_DnsQueryUTF8);
+            if (p_DnsQueryEx) DetourAttach(&(PVOID&)p_DnsQueryEx, Hook_DnsQueryEx);
+            DetourTransactionCommit();
+            g_dnsHooked = (p_DnsQueryW || p_DnsQueryA || p_DnsQueryUTF8 || p_DnsQueryEx);
+        }
+    }
+}
+
+static bool is_target_module(HMODULE h, const wchar_t* target)
+{
+    if (!h) return false;
+    wchar_t path[MAX_PATH]{};
+    if (!GetModuleFileNameW(h, path, MAX_PATH)) return false;
+    const wchar_t* base = PathFindFileNameW(path);
+    return (base && _wcsicmp(base, target) == 0);
+}
+
+// Kernel32 detours to catch late loads
+static HMODULE WINAPI Hook_LoadLibraryW(LPCWSTR lpLibFileName)
+{
+    HMODULE h = p_LoadLibraryW ? p_LoadLibraryW(lpLibFileName) : NULL;
+    if (h && (is_target_module(h, L"ws2_32.dll") || is_target_module(h, L"dnsapi.dll"))) {
+        ensure_hooks();
+    }
+    return h;
+}
+static HMODULE WINAPI Hook_LoadLibraryA(LPCSTR lpLibFileName)
+{
+    HMODULE h = p_LoadLibraryA ? p_LoadLibraryA(lpLibFileName) : NULL;
+    if (h && (is_target_module(h, L"ws2_32.dll") || is_target_module(h, L"dnsapi.dll"))) {
+        ensure_hooks();
+    }
+    return h;
+}
+static HMODULE WINAPI Hook_LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    HMODULE h = p_LoadLibraryExW ? p_LoadLibraryExW(lpLibFileName, hFile, dwFlags) : NULL;
+    if (h && (is_target_module(h, L"ws2_32.dll") || is_target_module(h, L"dnsapi.dll"))) {
+        ensure_hooks();
+    }
+    return h;
+}
+static HMODULE WINAPI Hook_LoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    HMODULE h = p_LoadLibraryExA ? p_LoadLibraryExA(lpLibFileName, hFile, dwFlags) : NULL;
+    if (h && (is_target_module(h, L"ws2_32.dll") || is_target_module(h, L"dnsapi.dll"))) {
+        ensure_hooks();
+    }
+    return h;
+}
+
 static void install_hooks()
 {
-    HMODULE hWs2 = GetModuleHandleW(L"ws2_32.dll");
-    if (hWs2) p_connect = (PFN_connect)GetProcAddress(hWs2, "connect");
-    if (hWs2) {
-        p_WSAAddressToStringW = (PFN_WSAAddressToStringW)GetProcAddress(hWs2, "WSAAddressToStringW");
-        p_InetNtopW = (PFN_InetNtopW)GetProcAddress(hWs2, "InetNtopW");
+    // Attach kernel32 loaders to detect late ws2_32/dnsapi loads
+    HMODULE hK32 = GetModuleHandleW(L"kernel32.dll");
+    if (hK32) {
+        p_LoadLibraryW   = (PFN_LoadLibraryW)GetProcAddress(hK32, "LoadLibraryW");
+        p_LoadLibraryA   = (PFN_LoadLibraryA)GetProcAddress(hK32, "LoadLibraryA");
+        p_LoadLibraryExW = (PFN_LoadLibraryExW)GetProcAddress(hK32, "LoadLibraryExW");
+        p_LoadLibraryExA = (PFN_LoadLibraryExA)GetProcAddress(hK32, "LoadLibraryExA");
+        DetourTransactionBegin();
+        DetourUpdateThread(GetCurrentThread());
+        if (p_LoadLibraryW)   DetourAttach(&(PVOID&)p_LoadLibraryW, Hook_LoadLibraryW);
+        if (p_LoadLibraryA)   DetourAttach(&(PVOID&)p_LoadLibraryA, Hook_LoadLibraryA);
+        if (p_LoadLibraryExW) DetourAttach(&(PVOID&)p_LoadLibraryExW, Hook_LoadLibraryExW);
+        if (p_LoadLibraryExA) DetourAttach(&(PVOID&)p_LoadLibraryExA, Hook_LoadLibraryExA);
+        DetourTransactionCommit();
     }
-    HMODULE hDns = GetModuleHandleW(L"dnsapi.dll");
-    if (hDns) p_DnsQueryW = (PFN_DnsQuery_W)GetProcAddress(hDns, "DnsQuery_W");
-    if (hDns) p_DnsQueryA = (PFN_DnsQuery_A)GetProcAddress(hDns, "DnsQuery_A");
-    if (hDns) p_DnsQueryUTF8 = (PFN_DnsQuery_UTF8)GetProcAddress(hDns, "DnsQuery_UTF8");
-    if (hDns) p_DnsQueryEx = (PFN_DnsQueryEx)GetProcAddress(hDns, "DnsQueryEx");
 
-    DetourRestoreAfterWith();
-    if (DetourTransactionBegin() != NO_ERROR) return;
-    DetourUpdateThread(GetCurrentThread());
-    if (p_connect) DetourAttach(&(PVOID&)p_connect, Hook_connect);
-    if (p_DnsQueryW) DetourAttach(&(PVOID&)p_DnsQueryW, Hook_DnsQueryW);
-    if (p_DnsQueryA) DetourAttach(&(PVOID&)p_DnsQueryA, Hook_DnsQueryA);
-    if (p_DnsQueryUTF8) DetourAttach(&(PVOID&)p_DnsQueryUTF8, Hook_DnsQueryUTF8);
-    if (p_DnsQueryEx) DetourAttach(&(PVOID&)p_DnsQueryEx, Hook_DnsQueryEx);
-    DetourTransactionCommit();
+    // Try to install immediate hooks if modules are already loaded
+    ensure_hooks();
 }
 
 static void init_paths(HINSTANCE h)
