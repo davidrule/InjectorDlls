@@ -6,6 +6,7 @@
 #include <windns.h>
 #include <shlwapi.h>
 #include <unordered_map>
+#include <vector>
 #include <string>
 #include "detours.h"
 
@@ -16,6 +17,10 @@ typedef DNS_STATUS (WINAPI *PFN_DnsQuery_UTF8)(LPCSTR, WORD, DWORD, PVOID, PDNS_
 typedef DNS_STATUS (WINAPI *PFN_DnsQueryEx)(PDNS_QUERY_REQUEST, PDNS_QUERY_RESULT, PVOID);
 typedef INT (WSAAPI *PFN_WSAAddressToStringW)(LPSOCKADDR, DWORD, LPWSAPROTOCOL_INFOW, LPWSTR, LPDWORD);
 typedef PCWSTR (WINAPI *PFN_InetNtopW)(INT, PVOID, PWSTR, size_t);
+typedef INT (WINSOCK_API_LINKAGE *PFN_GetAddrInfoW)(PCWSTR, PCWSTR, const ADDRINFOW*, PADDRINFOW*);
+typedef INT (WINSOCK_API_LINKAGE *PFN_GetAddrInfoExW)(PCWSTR, PCWSTR, DWORD, ULONG, const ADDRINFOEXW*, PADDRINFOEXW*, struct timeval*, LPOVERLAPPED, LPLOOKUPSERVICE_COMPLETION_ROUTINE, LPHANDLE);
+typedef INT (WINSOCK_API_LINKAGE *PFN_getaddrinfo)(const char*, const char*, const addrinfo*, addrinfo**);
+typedef INT (WSAAPI *PFN_WSAConnect)(SOCKET, const sockaddr*, int, LPWSABUF, LPWSABUF, LPQOS, LPQOS);
 // Late-load helpers
 typedef HMODULE (WINAPI *PFN_LoadLibraryW)(LPCWSTR);
 typedef HMODULE (WINAPI *PFN_LoadLibraryA)(LPCSTR);
@@ -29,6 +34,10 @@ static PFN_DnsQuery_UTF8  p_DnsQueryUTF8 = nullptr;  // dnsapi!DnsQuery_UTF8
 static PFN_DnsQueryEx     p_DnsQueryEx = nullptr;    // dnsapi!DnsQueryEx
 static PFN_WSAAddressToStringW p_WSAAddressToStringW = nullptr; // ws2_32!WSAAddressToStringW
 static PFN_InetNtopW      p_InetNtopW = nullptr;     // ws2_32!InetNtopW (if available)
+static PFN_GetAddrInfoW   p_GetAddrInfoW = nullptr;  // ws2_32!GetAddrInfoW
+static PFN_GetAddrInfoExW p_GetAddrInfoExW = nullptr;// ws2_32!GetAddrInfoExW
+static PFN_getaddrinfo    p_getaddrinfo = nullptr;   // ws2_32!getaddrinfo (ANSI)
+static PFN_WSAConnect     p_WSAConnect = nullptr;    // ws2_32!WSAConnect
 // Kernel32 detours
 static PFN_LoadLibraryW   p_LoadLibraryW = nullptr;
 static PFN_LoadLibraryA   p_LoadLibraryA = nullptr;
@@ -45,9 +54,11 @@ static bool g_headerWritten = false;
 static CRITICAL_SECTION g_mapLock;
 static std::unordered_map<unsigned long, std::wstring> g_ip4ToHost; // IPv4 in network order
 static std::unordered_map<std::wstring, std::wstring> g_ip6ToHost;  // IPv6 numeric string -> host
+static std::vector<std::wstring> g_buffer;
 
-static void write_line(const wchar_t* line)
+static void write_lines_and_clear()
 {
+    if (g_buffer.empty()) return;
     HANDLE h = CreateFileW(g_logPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr,
         OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) return;
@@ -58,9 +69,12 @@ static void write_line(const wchar_t* line)
         g_headerWritten = true;
     }
     SetFilePointer(h, 0, nullptr, FILE_END);
-    DWORD w=0; WriteFile(h, line, (DWORD)(wcslen(line)*sizeof(wchar_t)), &w, nullptr);
-    const wchar_t* crlf = L"\r\n"; WriteFile(h, crlf, (DWORD)(2*sizeof(wchar_t)), &w, nullptr);
+    for (const auto& s : g_buffer) {
+        DWORD w=0; WriteFile(h, s.c_str(), (DWORD)(s.size()*sizeof(wchar_t)), &w, nullptr);
+        const wchar_t* crlf = L"\r\n"; WriteFile(h, crlf, (DWORD)(2*sizeof(wchar_t)), &w, nullptr);
+    }
     CloseHandle(h);
+    g_buffer.clear();
 }
 
 static void log_row(const std::wstring& ip, const std::wstring& host)
@@ -68,7 +82,13 @@ static void log_row(const std::wstring& ip, const std::wstring& host)
     wchar_t buf[256];
     // pad IP to 22 columns approx
     swprintf(buf, _countof(buf), L"%-22ls%ls", ip.c_str(), host.c_str());
-    write_line(buf);
+    EnterCriticalSection(&g_mapLock);
+    g_buffer.emplace_back(buf);
+    // Flush opportunistically to limit loss if crashes
+    if (g_buffer.size() >= 128) {
+        write_lines_and_clear();
+    }
+    LeaveCriticalSection(&g_mapLock);
 }
 
 static unsigned short bswap16(unsigned short v) { return (unsigned short)((v<<8) | (v>>8)); }
@@ -132,6 +152,75 @@ static INT WINAPI Hook_connect(SOCKET s, const struct sockaddr* name, int namele
     }
     log_row(ipOnly, host);
     return p_connect ? p_connect(s, name, namelen) : WSAENOTSOCK;
+}
+
+static INT WINSOCK_API_LINKAGE Hook_GetAddrInfoW(PCWSTR node, PCWSTR service, const ADDRINFOW* hints, PADDRINFOW* result)
+{
+    INT st = p_GetAddrInfoW ? p_GetAddrInfoW(node, service, hints, result) : EAI_FAIL;
+    if (st == 0 && result && *result && node) {
+        EnterCriticalSection(&g_mapLock);
+        for (const ADDRINFOW* ai = *result; ai != nullptr; ai = ai->ai_next) {
+            if (ai->ai_addr) {
+                std::wstring ip = numeric_addr_from_sockaddr(ai->ai_addr);
+                if (ai->ai_family == AF_INET) {
+                    const sockaddr_in* s4 = (const sockaddr_in*)ai->ai_addr;
+                    unsigned long ip4 = s4->sin_addr.S_un.S_addr;
+                    g_ip4ToHost[ip4] = node;
+                } else if (ai->ai_family == AF_INET6) {
+                    g_ip6ToHost[ip] = node;
+                }
+            }
+        }
+        LeaveCriticalSection(&g_mapLock);
+    }
+    return st;
+}
+
+static INT WINSOCK_API_LINKAGE Hook_getaddrinfo(const char* node, const char* service, const addrinfo* hints, addrinfo** result)
+{
+    INT st = p_getaddrinfo ? p_getaddrinfo(node, service, hints, result) : EAI_FAIL;
+    if (st == 0 && result && *result && node) {
+        int wlen = MultiByteToWideChar(CP_ACP, 0, node, -1, nullptr, 0);
+        std::wstring wnode; wnode.resize(wlen ? (wlen-1) : 0);
+        if (wlen) MultiByteToWideChar(CP_ACP, 0, node, -1, &wnode[0], wlen);
+        EnterCriticalSection(&g_mapLock);
+        for (const addrinfo* ai = *result; ai != nullptr; ai = ai->ai_next) {
+            if (ai->ai_addr) {
+                std::wstring ip = numeric_addr_from_sockaddr(ai->ai_addr);
+                if (ai->ai_family == AF_INET) {
+                    const sockaddr_in* s4 = (const sockaddr_in*)ai->ai_addr;
+                    unsigned long ip4 = s4->sin_addr.S_un.S_addr;
+                    g_ip4ToHost[ip4] = wnode;
+                } else if (ai->ai_family == AF_INET6) {
+                    g_ip6ToHost[ip] = wnode;
+                }
+            }
+        }
+        LeaveCriticalSection(&g_mapLock);
+    }
+    return st;
+}
+
+static INT WSAAPI Hook_WSAConnect(SOCKET s, const sockaddr* name, int namelen, LPWSABUF a, LPWSABUF b, LPQOS c, LPQOS d)
+{
+    // Log similarly to connect()
+    std::wstring ipOnly = numeric_addr_from_sockaddr(name);
+    std::wstring host = L"No available/local";
+    if (name && name->sa_family == AF_INET) {
+        const sockaddr_in* s4 = (const sockaddr_in*)name;
+        unsigned long key = s4->sin_addr.S_un.S_addr;
+        EnterCriticalSection(&g_mapLock);
+        auto it = g_ip4ToHost.find(key);
+        if (it != g_ip4ToHost.end()) host = it->second;
+        LeaveCriticalSection(&g_mapLock);
+    } else if (name && name->sa_family == AF_INET6) {
+        EnterCriticalSection(&g_mapLock);
+        auto it6 = g_ip6ToHost.find(ipOnly);
+        if (it6 != g_ip6ToHost.end()) host = it6->second;
+        LeaveCriticalSection(&g_mapLock);
+    }
+    log_row(ipOnly, host);
+    return p_WSAConnect ? p_WSAConnect(s, name, namelen, a, b, c, d) : WSAENOTSOCK;
 }
 
 static DNS_STATUS WINAPI Hook_DnsQueryW(LPCWSTR name, WORD type, DWORD options, PVOID extra, PDNS_RECORDW* prec, PVOID* preserved)
@@ -222,11 +311,18 @@ static void ensure_hooks()
         HMODULE hWs2 = GetModuleHandleW(L"ws2_32.dll");
         if (hWs2) {
             if (!p_connect) p_connect = (PFN_connect)GetProcAddress(hWs2, "connect");
+            if (!p_WSAConnect) p_WSAConnect = (PFN_WSAConnect)GetProcAddress(hWs2, "WSAConnect");
+            if (!p_GetAddrInfoW) p_GetAddrInfoW = (PFN_GetAddrInfoW)GetProcAddress(hWs2, "GetAddrInfoW");
+            if (!p_GetAddrInfoExW) p_GetAddrInfoExW = (PFN_GetAddrInfoExW)GetProcAddress(hWs2, "GetAddrInfoExW");
+            if (!p_getaddrinfo) p_getaddrinfo = (PFN_getaddrinfo)GetProcAddress(hWs2, "getaddrinfo");
             if (!p_WSAAddressToStringW) p_WSAAddressToStringW = (PFN_WSAAddressToStringW)GetProcAddress(hWs2, "WSAAddressToStringW");
             if (!p_InetNtopW) p_InetNtopW = (PFN_InetNtopW)GetProcAddress(hWs2, "InetNtopW");
             DetourTransactionBegin();
             DetourUpdateThread(GetCurrentThread());
             if (p_connect) DetourAttach(&(PVOID&)p_connect, Hook_connect);
+            if (p_WSAConnect) DetourAttach(&(PVOID&)p_WSAConnect, Hook_WSAConnect);
+            if (p_GetAddrInfoW) DetourAttach(&(PVOID&)p_GetAddrInfoW, Hook_GetAddrInfoW);
+            if (p_getaddrinfo) DetourAttach(&(PVOID&)p_getaddrinfo, Hook_getaddrinfo);
             DetourTransactionCommit();
             g_ws2Hooked = (p_connect != nullptr);
         }
