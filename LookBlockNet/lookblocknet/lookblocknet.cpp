@@ -17,9 +17,9 @@ typedef DNS_STATUS (WINAPI *PFN_DnsQuery_UTF8)(LPCSTR, WORD, DWORD, PVOID, PDNS_
 typedef DNS_STATUS (WINAPI *PFN_DnsQueryEx)(PDNS_QUERY_REQUEST, PDNS_QUERY_RESULT, PVOID);
 typedef INT (WSAAPI *PFN_WSAAddressToStringW)(LPSOCKADDR, DWORD, LPWSAPROTOCOL_INFOW, LPWSTR, LPDWORD);
 typedef PCWSTR (WINAPI *PFN_InetNtopW)(INT, PVOID, PWSTR, size_t);
-typedef INT (WINSOCK_API_LINKAGE *PFN_GetAddrInfoW)(PCWSTR, PCWSTR, const ADDRINFOW*, PADDRINFOW*);
-typedef INT (WINSOCK_API_LINKAGE *PFN_GetAddrInfoExW)(PCWSTR, PCWSTR, DWORD, ULONG, const ADDRINFOEXW*, PADDRINFOEXW*, struct timeval*, LPOVERLAPPED, LPLOOKUPSERVICE_COMPLETION_ROUTINE, LPHANDLE);
-typedef INT (WINSOCK_API_LINKAGE *PFN_getaddrinfo)(const char*, const char*, const addrinfo*, addrinfo**);
+typedef INT (WINAPI *PFN_GetAddrInfoW)(PCWSTR, PCWSTR, const ADDRINFOW*, PADDRINFOW*);
+typedef INT (WINAPI *PFN_GetAddrInfoExW)(PCWSTR, PCWSTR, DWORD, ULONG, const ADDRINFOEXW*, PADDRINFOEXW*, struct timeval*, LPOVERLAPPED, LPLOOKUPSERVICE_COMPLETION_ROUTINE, LPHANDLE);
+typedef INT (WINAPI *PFN_getaddrinfo)(const char*, const char*, const addrinfo*, addrinfo**);
 typedef INT (WSAAPI *PFN_WSAConnect)(SOCKET, const sockaddr*, int, LPWSABUF, LPWSABUF, LPQOS, LPQOS);
 // Late-load helpers
 typedef HMODULE (WINAPI *PFN_LoadLibraryW)(LPCWSTR);
@@ -154,7 +154,7 @@ static INT WINAPI Hook_connect(SOCKET s, const struct sockaddr* name, int namele
     return p_connect ? p_connect(s, name, namelen) : WSAENOTSOCK;
 }
 
-static INT WINSOCK_API_LINKAGE Hook_GetAddrInfoW(PCWSTR node, PCWSTR service, const ADDRINFOW* hints, PADDRINFOW* result)
+static INT WINAPI Hook_GetAddrInfoW(PCWSTR node, PCWSTR service, const ADDRINFOW* hints, PADDRINFOW* result)
 {
     INT st = p_GetAddrInfoW ? p_GetAddrInfoW(node, service, hints, result) : EAI_FAIL;
     if (st == 0 && result && *result && node) {
@@ -176,7 +176,7 @@ static INT WINSOCK_API_LINKAGE Hook_GetAddrInfoW(PCWSTR node, PCWSTR service, co
     return st;
 }
 
-static INT WINSOCK_API_LINKAGE Hook_getaddrinfo(const char* node, const char* service, const addrinfo* hints, addrinfo** result)
+static INT WINAPI Hook_getaddrinfo(const char* node, const char* service, const addrinfo* hints, addrinfo** result)
 {
     INT st = p_getaddrinfo ? p_getaddrinfo(node, service, hints, result) : EAI_FAIL;
     if (st == 0 && result && *result && node) {
@@ -434,6 +434,7 @@ BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
         MessageBoxW(NULL, L"LookBlockNet DLL loaded and hooks installed.\nCheck for log file in app directory.", 
                    L"LookBlockNet", MB_OK | MB_ICONINFORMATION);
     } else if (r == DLL_PROCESS_DETACH) {
+        write_lines_and_clear();
         DeleteCriticalSection(&g_mapLock);
     }
     return TRUE;
