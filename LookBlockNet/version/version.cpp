@@ -124,9 +124,28 @@ extern "C" BOOL WINAPI TI_VerQueryValueW(LPCVOID p,LPCWSTR s,LPVOID *o,PUINT u){
 BOOL WINAPI DllMain(HINSTANCE h, DWORD r, LPVOID)
 {
     if (r == DLL_PROCESS_ATTACH) {
+        // Load the real system version.dll first
         load_real_version_and_plugins(h);
-        HANDLE th = CreateThread(NULL, 0, load_lookblocknet_async, h, 0, NULL);
-        if (th) CloseHandle(th);
+
+        // Now, attempt to load our plugin with aggressive error reporting
+        wchar_t dir[MAX_PATH];
+        if (GetModuleFileNameW(h, dir, MAX_PATH)) {
+            PathRemoveFileSpecW(dir);
+            wchar_t pluginPath[MAX_PATH];
+            wcscpy_s(pluginPath, dir);
+            PathAppendW(pluginPath, L"lookblocknet.dll");
+            
+            // Attempt to load the library
+            g_lookBlockNet = LoadLibraryW(pluginPath);
+
+            // If it fails, show a popup box with the error. THIS IS FOR DEBUGGING.
+            if (!g_lookBlockNet) {
+                DWORD err = GetLastError();
+                wchar_t msg[512];
+                wsprintfW(msg, L"LookBlockNet DEBUG\n\nFailed to load lookblocknet.dll from:\n%s\n\nError Code: %lu", pluginPath, err);
+                MessageBoxW(NULL, msg, L"Proxy DLL Error", MB_OK | MB_ICONERROR);
+            }
+        }
     }
     return TRUE;
 }
